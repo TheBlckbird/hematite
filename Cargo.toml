@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 thiserror = "2.0"
+uuid = { version = "1.23.3", features = ["v4", "v7"] }

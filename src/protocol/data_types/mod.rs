@@ -1,6 +1,7 @@
 pub mod bool;
 pub mod num_types;
 pub mod string;
+pub mod uuid;
 pub mod var_int;
 
 /*
@@ -26,7 +27,7 @@ pub mod var_int;
 [ ] NBT
 [ ] Position
 [ ] Angle
-[ ] UUID
+[x] UUID
 [ ] BitSet
 [ ] Fixed BitSet
 [ ] Optional
