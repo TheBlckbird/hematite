@@ -4,6 +4,7 @@ pub mod proto_string;
 pub mod uuid;
 pub mod var_int;
 pub mod position;
+pub mod angle;
 
 /*
 
@@ -27,7 +28,7 @@ pub mod position;
 [ ] Hashed Slot
 [ ] NBT
 [x] Position
-[ ] Angle
+[x] Angle
 [x] UUID
 [ ] BitSet
 [ ] Fixed BitSet
