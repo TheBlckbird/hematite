@@ -1,31 +1,39 @@
-use std::ops::{Deref, DerefMut};
+use std::{
+    io::{BufRead, Write},
+    ops::{Deref, DerefMut},
+};
 
-use serde::{Deserialize, Serialize};
+use crate::protocol::ser_de::{
+    de::{self, Deserialize},
+    ser::{self, Serialize},
+};
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub struct VarInt(pub i32);
 
-impl VarInt {
-    pub fn encode(&self) -> Vec<u8> {
-        let mut bytes = Vec::new();
+impl Serialize for VarInt {
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), ser::Error> {
         let mut value = **self as u32;
 
         while (value & !0x7F) != 0 {
             let byte = ((value & 0x7F) | 0x80) as u8;
-            bytes.push(byte);
+            writer.write_all(&[byte]).map_err(ser::Error::Io)?;
             value >>= 7;
         }
-        bytes.push(value as u8);
+        writer.write_all(&[value as u8]).map_err(ser::Error::Io)?;
 
-        bytes
+        Ok(())
     }
+}
 
-    pub fn decode(bytes: &[u8]) -> Result<Self, String> {
+impl Deserialize for VarInt {
+    fn deserialize<R: BufRead>(reader: &mut R) -> Result<Self, de::Error> {
         let mut value = 0;
-        let mut bytes = bytes.iter();
 
         for position in (0..32).step_by(7) {
-            let current_byte = *bytes.next().ok_or("Unexpected end of bytes")?;
+            let mut buffer = [0; 1];
+            reader.read_exact(&mut buffer).map_err(de::Error::Io)?;
+            let current_byte = buffer[0];
 
             value |= ((current_byte & 0x7F) as i32) << position;
 
@@ -34,26 +42,7 @@ impl VarInt {
             }
         }
 
-        Err("VarInt incomplete or too large".into())
-    }
-}
-
-impl Serialize for VarInt {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serde_bytes::serialize(&self.encode(), serializer)
-    }
-}
-
-impl<'de> Deserialize<'de> for VarInt {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let bytes = serde_bytes::deserialize(deserializer)?;
-        VarInt::decode(bytes).map_err(serde::de::Error::custom)
+        Err(de::Error::Message("VarInt incomplete or too large")) // [TODO] convert to custom error
     }
 }
 
@@ -73,6 +62,8 @@ impl DerefMut for VarInt {
 
 #[cfg(test)]
 mod tests {
+    use std::io::BufReader;
+
     use super::*;
 
     #[test]
@@ -92,7 +83,10 @@ mod tests {
         ];
 
         for (value, expected) in test_cases {
-            assert_eq!(VarInt(value).encode(), expected, "Failed for value {value}");
+            let mut writer = Vec::new();
+            VarInt(value).serialize(&mut writer).unwrap();
+
+            assert_eq!(writer, expected, "Failed for value {value}");
         }
     }
 
@@ -113,9 +107,11 @@ mod tests {
         ];
 
         for (expected, bytes) in test_cases {
+            let mut reader = BufReader::new(bytes.as_slice());
+
             assert_eq!(
-                VarInt::decode(&bytes),
-                Ok(VarInt(expected)),
+                VarInt::deserialize(&mut reader).unwrap(),
+                VarInt(expected),
                 "Failed for value {expected}"
             );
         }
