@@ -146,6 +146,18 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
+    fn test_too_high_panics() {
+        Position::new(i32::MAX, i16::MAX, i32::MAX);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_too_low_panics() {
+        Position::new(i32::MIN, i16::MIN, i32::MIN);
+    }
+
+    #[test]
     fn test_position_deserialization_eof() {
         // An 8-byte chunk is mandatory; check that partial payloads are rejected
         let broken_payload = vec![0u8; 5];
