@@ -1,10 +1,11 @@
+pub mod angle;
 pub mod bool;
+pub mod identifier;
 pub mod num_types;
+pub mod position;
 pub mod proto_string;
 pub mod uuid;
 pub mod var_int;
-pub mod position;
-pub mod angle;
 
 /*
 
@@ -20,7 +21,7 @@ pub mod angle;
 [x] String
 [ ] Text Component
 [ ] JSON Text Component
-[ ] Identifier
+[x] Identifier
 [ ] VarInt
 [ ] VarLong
 [ ] Entity Metadata
