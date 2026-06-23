@@ -1,8 +1,10 @@
 pub mod angle;
+pub mod array;
 pub mod bool;
 pub mod identifier;
 pub mod num_types;
 pub mod position;
+pub mod prefixed_array;
 pub mod proto_string;
 pub mod uuid;
 pub mod var_int;
@@ -35,8 +37,8 @@ pub mod var_int;
 [ ] Fixed BitSet
 [ ] Optional
 [ ] Prefixed Optional
-[ ] Array
-[ ] Prefixed Array
+[x] Array
+[x] Prefixed Array
 [ ] Enum
 [ ] Byte Array
 [ ] ID or X
