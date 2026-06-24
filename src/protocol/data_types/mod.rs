@@ -52,19 +52,10 @@ pub mod var_int;
 [ ] Slot Display
 [ ] Light Data
 [ ] Either X or Y
-[ ] Game Profile
+[x] Game Profile
 [ ] Resolvable Profile
 [ ] Debug Subscription Event
 [ ] Debug Subscription Update
 [ ] LpVec3
 
 */
-
-impl crate::protocol::ser_de::ser::Serialize for u128 {
-    fn serialize<W: std::io::prelude::Write>(
-        &self,
-        writer: &mut W,
-    ) -> Result<(), super::ser_de::ser::Error> {
-        todo!()
-    }
-}

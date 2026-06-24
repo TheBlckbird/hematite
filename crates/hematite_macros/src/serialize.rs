@@ -1,18 +1,25 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::DeriveInput;
+use syn::{Data, DeriveInput, Member};
 
 pub fn impl_serialize_macro(ast: &DeriveInput) -> TokenStream {
     let struct_name = &ast.ident;
     let serialize = match &ast.data {
-        syn::Data::Struct(data_struct) => {
+        Data::Struct(data_struct) => {
             let mut serializables = Vec::new();
 
-            for field in &data_struct.fields {
-                let ident = field.ident.as_ref().unwrap();
+            for (field_index, field) in data_struct.fields.iter().enumerate() {
+                serializables.push(match field.ident.as_ref() {
+                    Some(ident) => quote! {
+                        self.#ident.serialize(writer)?;
+                    },
+                    None => {
+                        let member = Member::from(field_index);
 
-                serializables.push(quote! {
-                    self.#ident.serialize(writer)?;
+                        quote! {
+                            self.#member.serialize(writer)?;
+                        }
+                    }
                 });
             }
 
@@ -20,8 +27,8 @@ pub fn impl_serialize_macro(ast: &DeriveInput) -> TokenStream {
                 #(#serializables)*
             }
         }
-        syn::Data::Enum(data_enum) => todo!("Enums are currently not supported"),
-        syn::Data::Union(data_union) => todo!("Data Unions are currently not supported"),
+        Data::Enum(data_enum) => todo!("Enums are currently not supported"),
+        Data::Union(_) => unimplemented!("Data Unions are not supported"),
     };
 
     quote! {
