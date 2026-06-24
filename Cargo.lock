@@ -122,8 +122,17 @@ name = "hematite"
 version = "0.1.0"
 dependencies = [
  "derive_more",
+ "hematite_macros",
  "thiserror",
  "uuid",
+]
+
+[[package]]
+name = "hematite_macros"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn",
 ]
 
 [[package]]

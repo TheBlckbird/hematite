@@ -1,7 +1,7 @@
 pub mod angle;
 pub mod array;
 pub mod bool;
-// pub mod game_profile;
+pub mod game_profile;
 pub mod identifier;
 pub mod num_types;
 pub mod option;
@@ -59,3 +59,12 @@ pub mod var_int;
 [ ] LpVec3
 
 */
+
+impl crate::protocol::ser_de::ser::Serialize for u128 {
+    fn serialize<W: std::io::prelude::Write>(
+        &self,
+        writer: &mut W,
+    ) -> Result<(), super::ser_de::ser::Error> {
+        todo!()
+    }
+}

@@ -1,7 +1,6 @@
-use std::{
-    io::{BufRead, Write},
-    ops::{Deref, DerefMut},
-};
+use std::io::{BufRead, Write};
+
+use derive_more::{Deref, DerefMut};
 
 use crate::protocol::{
     data_types::var_int::VarInt,
@@ -11,85 +10,66 @@ use crate::protocol::{
     },
 };
 
+const DEFAULT_MAX_LEN: usize = 32_767;
+
 /// String type used for the protocol.
 ///
 /// It can additionally store a maximum length in UTF16 chars.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ProtoString {
-    inner: String,
-    /// Max length in UTF16 bytes. Defaults to 32767
-    pub max_len: usize,
-}
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Deref, DerefMut)]
+pub struct ProtoString<const MAX_LEN: usize = DEFAULT_MAX_LEN>(String);
 
-impl ProtoString {
-    const MAX_LEN: usize = 32_767;
+impl<const MAX_LEN: usize> ProtoString<MAX_LEN> {
+    const _ASSERT_MAX_LEN: () = {
+        assert!(MAX_LEN <= DEFAULT_MAX_LEN, "MAX_LEN cannot exceed 32,767");
+    };
 
-    pub fn new(inner: impl Into<String>, max_len: usize) -> Self {
-        Self {
-            inner: inner.into(),
-            max_len,
-        }
+    pub fn new(inner: impl Into<String>) -> Self {
+        #[allow(clippy::let_unit_value)]
+        let _ = Self::_ASSERT_MAX_LEN;
+        Self(inner.into())
     }
 
     pub fn into_inner(self) -> String {
-        self.inner
+        self.0
     }
 }
 
-impl From<String> for ProtoString {
+impl<const MAX_LEN: usize> From<String> for ProtoString<MAX_LEN> {
     fn from(value: String) -> Self {
-        Self {
-            inner: value,
-            max_len: Self::MAX_LEN,
-        }
+        Self::new(value)
     }
 }
 
-impl From<&str> for ProtoString {
+impl<const MAX_LEN: usize> From<&str> for ProtoString<MAX_LEN> {
     fn from(value: &str) -> Self {
-        Self {
-            inner: value.into(),
-            max_len: Self::MAX_LEN,
-        }
+        Self::new(value)
     }
 }
 
-impl From<ProtoString> for String {
-    fn from(value: ProtoString) -> Self {
+impl<const MAX_LEN: usize> From<ProtoString<MAX_LEN>> for String {
+    fn from(value: ProtoString<MAX_LEN>) -> Self {
         value.into_inner()
     }
 }
 
-impl Deref for ProtoString {
-    type Target = String;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-impl DerefMut for ProtoString {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
-    }
-}
-
-impl Serialize for ProtoString {
+impl<const MAX_LEN: usize> Serialize for ProtoString<MAX_LEN> {
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), ser::Error> {
+        assert!(MAX_LEN <= DEFAULT_MAX_LEN, "MAX_LEN cannot exceed 32,767");
+
         let utf16_len = self.chars().map(|c| c.len_utf16()).sum::<usize>();
 
-        if utf16_len > self.max_len {
+        if utf16_len > MAX_LEN {
             return Err(ser::Error::TooLong {
-                expected: self.max_len,
+                expected: MAX_LEN,
                 actual: utf16_len,
                 context: "String length in UTF16",
             });
         }
 
         let bytes_len = self.len();
-        if bytes_len > self.max_len * 3 {
+        if bytes_len > MAX_LEN * 3 {
             return Err(ser::Error::TooLong {
-                expected: self.max_len * 3,
+                expected: MAX_LEN * 3,
                 actual: bytes_len,
                 context: "String length in bytes",
             });
@@ -102,14 +82,13 @@ impl Serialize for ProtoString {
     }
 }
 
-impl Deserialize for ProtoString {
+impl<const MAX_LEN: usize> Deserialize for ProtoString<MAX_LEN> {
     fn deserialize<R: BufRead>(reader: &mut R) -> Result<Self, de::Error> {
-        let max_len = Self::MAX_LEN;
         let bytes_length = *VarInt::deserialize(reader)? as usize;
 
-        if bytes_length > max_len * 3 {
+        if bytes_length > MAX_LEN * 3 {
             return Err(de::Error::TooLong {
-                expected: max_len * 3,
+                expected: MAX_LEN * 3,
                 actual: bytes_length,
                 context: "String deserialization, exceeds max length in bytes (32767 * 3 = 98301)",
             });
@@ -119,10 +98,7 @@ impl Deserialize for ProtoString {
         reader.read_exact(&mut byte_buffer).map_err(de::Error::Io)?;
         let value = String::from_utf8(byte_buffer).map_err(de::Error::FromUtf8Error)?;
 
-        Ok(Self {
-            inner: value,
-            max_len,
-        })
+        Ok(Self::new(value))
     }
 }
 
@@ -133,7 +109,7 @@ mod tests {
 
     #[test]
     fn test_roundtrip_basic_ascii() {
-        let input = ProtoString::new("Hello!", 10);
+        let input = ProtoString::<10>::new("Hello!");
         let mut buffer = Vec::new();
 
         // Serialize
@@ -147,13 +123,13 @@ mod tests {
         let mut reader = Cursor::new(buffer);
         let output = ProtoString::deserialize(&mut reader).unwrap();
 
-        assert_eq!(input.inner, output.inner);
+        assert_eq!(input, output);
     }
 
     #[test]
     fn test_utf16_surrogate_counting() {
         // The crab emoji '🦀' is 4 bytes in UTF-8, but 2 code units in UTF-16
-        let input = ProtoString::new("🦀", 1);
+        let input = ProtoString::<1>::new("🦀");
         let mut buffer = Vec::new();
         let result = input.serialize(&mut buffer);
 
@@ -161,7 +137,7 @@ mod tests {
         assert!(result.is_err());
 
         // A max_len of 2 should pass
-        let input = ProtoString::new("🦀", 2);
+        let input = ProtoString::<2>::new("🦀");
         let mut buffer = Vec::new();
         input.serialize(&mut buffer).unwrap();
 
@@ -171,20 +147,20 @@ mod tests {
         // Ensure it roundtrips back perfectly
         let mut reader = Cursor::new(buffer);
         let output = ProtoString::deserialize(&mut reader).unwrap();
-        assert_eq!(input.inner, output.inner);
+        assert_eq!(input, output);
     }
 
     #[test]
     fn test_byte_limit_expansion() {
         // Devanagari character 'अ' is 3 bytes in UTF-8, 1 code unit in UTF-16.
-        let input = ProtoString::new("अ", 1);
+        let input = ProtoString::<1>::new("अ");
         let mut buffer = Vec::new();
         input.serialize(&mut buffer).unwrap();
         assert_eq!(buffer[0], 3); // 3 bytes on the wire
 
         let mut reader = Cursor::new(buffer);
         let output = ProtoString::deserialize(&mut reader).unwrap();
-        assert_eq!(input.inner, output.inner);
+        assert_eq!(input, output);
     }
 
     #[test]
@@ -195,7 +171,7 @@ mod tests {
         malicious_payload.extend_from_slice(b"short");
 
         let mut reader = Cursor::new(malicious_payload);
-        let result = ProtoString::deserialize(&mut reader);
+        let result = ProtoString::<32_767>::deserialize(&mut reader);
 
         // It should reject out-of-hand before allocating large vector pools
         assert!(result.is_err());
@@ -208,7 +184,7 @@ mod tests {
         buffer.extend_from_slice(&[0, 159, 146, 150]); // Invalid UTF-8 bytes
 
         let mut reader = Cursor::new(buffer);
-        let result = ProtoString::deserialize(&mut reader);
+        let result = ProtoString::<32_767>::deserialize(&mut reader);
 
         assert!(result.is_err());
     }
@@ -219,7 +195,7 @@ mod tests {
         let infinite_varint = vec![0x80, 0x80, 0x80, 0x80, 0x80, 0x80];
         let mut reader = Cursor::new(infinite_varint);
 
-        let result = ProtoString::deserialize(&mut reader);
+        let result = ProtoString::<32_767>::deserialize(&mut reader);
         assert!(result.is_err());
     }
 }

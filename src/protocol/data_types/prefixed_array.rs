@@ -1,7 +1,5 @@
 use std::io::{BufRead, Write};
 
-use derive_more::{Deref, DerefMut};
-
 use crate::protocol::{
     data_types::var_int::VarInt,
     ser_de::{
@@ -11,6 +9,21 @@ use crate::protocol::{
 };
 
 impl<T> Serialize for &[T]
+where
+    T: Serialize,
+{
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), ser::Error> {
+        VarInt(self.len() as i32).serialize(writer)?;
+
+        for element in self.iter() {
+            element.serialize(writer)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl<T> Serialize for Box<[T]>
 where
     T: Serialize,
 {
