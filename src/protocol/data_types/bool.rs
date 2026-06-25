@@ -19,15 +19,7 @@ impl Serialize for bool {
 impl Deserialize for bool {
     fn deserialize<R: std::io::prelude::BufRead>(reader: &mut R) -> Result<Self, de::Error> {
         let mut buffer = [0; 1];
-        reader
-            .read_exact(&mut buffer)
-            .map_err(|err| match err.kind() {
-                io::ErrorKind::UnexpectedEof => de::Error::TooFewBytes {
-                    expected: 1,
-                    actual: 0,
-                },
-                _ => de::Error::Io(err),
-            })?;
+        reader.read_exact(&mut buffer).map_err(de::Error::Io)?;
 
         match buffer[0] {
             0x00 => Ok(false),
