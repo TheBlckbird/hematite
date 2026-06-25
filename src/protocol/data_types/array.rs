@@ -67,6 +67,7 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
     fn test_wrong_length() {
         let input = [0x00u8, 0x05];
         let mut reader = BufReader::new(input.as_slice());
