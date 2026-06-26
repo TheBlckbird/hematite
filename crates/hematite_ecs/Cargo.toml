@@ -1,0 +1,8 @@
+[package]
+name = "hematite_ecs"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+variadics_please = "2.0"
+bevy_ecs.workspace = true

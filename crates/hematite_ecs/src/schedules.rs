@@ -1,5 +1,9 @@
 use bevy_ecs::schedule::ScheduleLabel;
 
+pub mod prelude {
+    pub use super::{First, Last, PostTick, PreTick, Shutdown, Startup, TickUpdate};
+}
+
 /// Run once at startup of the server
 #[derive(ScheduleLabel, Hash, Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Startup;
@@ -14,7 +18,7 @@ pub struct PreTick;
 
 /// Executed 20 times per second or every 50ms
 #[derive(ScheduleLabel, Hash, Debug, PartialEq, Eq, Clone, Copy)]
-pub struct Tick;
+pub struct TickUpdate;
 
 /// Executed after the main [`Tick`]
 #[derive(ScheduleLabel, Hash, Debug, PartialEq, Eq, Clone, Copy)]

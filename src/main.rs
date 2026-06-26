@@ -1,25 +1,18 @@
-use std::{
-    io::{BufRead, BufReader},
-    net::{Shutdown, SocketAddr, TcpListener},
-    process::exit,
-};
+use std::io::{BufRead, BufReader};
 
-use bevy_ecs::prelude::*;
+use derive_more::{Deref, DerefMut};
+use hematite_ecs::prelude::*;
 use thiserror::Error;
 
-use crate::{
-    ecs::app::App,
-    protocol::{
-        packets::{
-            PacketHeader, ServerboundPacket,
-            handshake::serverbound::Handshake,
-            status::serverbound::{ping_request::PingRequest, status_request::StatusRequest},
-        },
-        ser_de::de::{self, Deserialize},
+use crate::protocol::{
+    packets::{
+        PacketHeader, ServerboundPacket,
+        handshake::serverbound::Handshake,
+        status::serverbound::{ping_request::PingRequest, status_request::StatusRequest},
     },
+    ser_de::de::{self, Deserialize},
 };
 
-mod ecs;
 mod protocol;
 
 const PORT: u16 = 25565;
@@ -40,11 +33,14 @@ enum PacketError {
     UnknownId(u8),
 }
 
-fn a() {}
-fn b() {}
+#[derive(Resource, Default, Deref, DerefMut)]
+struct Counter(u8);
 
 fn main() {
-    let app = App::new();
+    let _ = App::new()
+        .init_resource::<Counter>()
+        .add_systems(TickUpdate, main)
+        .run();
 
     // let address = SocketAddr::from(([0, 0, 0, 0], PORT));
     // let listener = TcpListener::bind(address).unwrap();

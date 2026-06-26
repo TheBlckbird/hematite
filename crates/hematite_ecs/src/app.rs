@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     error::Error,
     thread::sleep,
     time::{Duration, Instant},
@@ -6,11 +7,21 @@ use std::{
 
 use bevy_ecs::{prelude::*, schedule::ScheduleLabel, system::ScheduleSystem};
 
-use crate::ecs::schedules::{First, Last, PostTick, PreTick, Shutdown, Startup, Tick};
+use crate::{
+    plugin::{Plugin, Plugins},
+    schedules::{First, Last, PostTick, PreTick, Shutdown, Startup, TickUpdate},
+};
+
+pub mod prelude {
+    pub use super::App;
+    pub use super::ShutdownFlag;
+}
 
 pub struct App {
     world: World,
     started: bool,
+    plugins: Vec<Box<dyn Plugin>>,
+    plugin_names: HashSet<String>,
 }
 
 #[derive(Debug, Resource, Default)]
@@ -33,7 +44,7 @@ impl App {
         let startup = Schedule::new(Startup);
         let first = Schedule::new(First);
         let pre_tick = Schedule::new(PreTick);
-        let tick = Schedule::new(Tick);
+        let tick = Schedule::new(TickUpdate);
         let post_tick = Schedule::new(PostTick);
         let last = Schedule::new(Last);
         let shutdown = Schedule::new(Shutdown);
@@ -51,6 +62,8 @@ impl App {
         Self {
             world,
             started: false,
+            plugins: Vec::new(),
+            plugin_names: HashSet::new(),
         }
     }
 
@@ -90,7 +103,7 @@ impl App {
 
             self.world.try_run_schedule(First)?;
             self.world.try_run_schedule(PreTick)?;
-            self.world.try_run_schedule(Tick)?;
+            self.world.try_run_schedule(TickUpdate)?;
             self.world.try_run_schedule(PostTick)?;
             self.world.try_run_schedule(Last)?;
 
@@ -109,5 +122,28 @@ impl App {
         self.world.try_run_schedule(Shutdown)?;
 
         Ok(())
+    }
+
+    pub fn add_plugins(&mut self, plugins: impl Plugins) -> &mut Self {
+        plugins.add_to_app(self);
+        self
+    }
+
+    pub(crate) fn add_boxed_plugin(&mut self, plugin: Box<dyn Plugin>) -> &mut Self {
+        if plugin.is_unique() && self.plugin_names.contains(plugin.name()) {
+            panic!("Plugin {} can only be added once to the app", plugin.name())
+        }
+
+        self.plugin_names.insert(plugin.name().to_string());
+        plugin.build(self);
+        self.plugins.push(plugin);
+
+        self
+    }
+}
+
+impl Default for App {
+    fn default() -> Self {
+        Self::new()
     }
 }
