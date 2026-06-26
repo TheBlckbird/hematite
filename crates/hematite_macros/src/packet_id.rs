@@ -57,14 +57,9 @@ pub fn impl_packet(ast: &DeriveInput) -> TokenStream {
     let ident = &ast.ident;
 
     quote! {
-        impl<#generics> crate::protocol::packets::Packet for #ident {
-            fn get_id() -> u8 {
-                #protocol_id
-            }
-
-            fn get_identifier() -> &'static str {
-                #packet_name
-            }
+        impl<#generics> crate::protocol::packets::PacketId for #ident {
+            const ID: u8 = #protocol_id;
+            const IDENTIFIER: &str = #packet_name;
         }
     }
     .into()

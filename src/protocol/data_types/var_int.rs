@@ -11,6 +11,22 @@ use crate::protocol::ser_de::{
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub struct VarInt(pub i32);
 
+impl VarInt {
+    pub fn len(&self) -> usize {
+        if self.is_positive() {
+            let len = 32 - self.leading_zeros();
+            (len as f32 / 7.0).ceil() as usize
+        } else {
+            let len = 32 - self.abs().leading_zeros();
+            (len as f32 / 7.0).ceil() as usize
+        }
+    }
+
+    pub fn into_inner(self) -> i32 {
+        self.0
+    }
+}
+
 impl Serialize for VarInt {
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), ser::Error> {
         let mut value = **self as u32;
