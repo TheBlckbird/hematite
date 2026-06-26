@@ -4,17 +4,22 @@ use std::{
     process::exit,
 };
 
+use bevy_ecs::prelude::*;
 use thiserror::Error;
 
-use crate::protocol::{
-    packets::{
-        PacketHeader, ServerboundPacket,
-        handshake::serverbound::Handshake,
-        status::serverbound::{ping_request::PingRequest, status_request::StatusRequest},
+use crate::{
+    ecs::app::App,
+    protocol::{
+        packets::{
+            PacketHeader, ServerboundPacket,
+            handshake::serverbound::Handshake,
+            status::serverbound::{ping_request::PingRequest, status_request::StatusRequest},
+        },
+        ser_de::de::{self, Deserialize},
     },
-    ser_de::de::{self, Deserialize},
 };
 
+mod ecs;
 mod protocol;
 
 const PORT: u16 = 25565;
@@ -35,27 +40,32 @@ enum PacketError {
     UnknownId(u8),
 }
 
+fn a() {}
+fn b() {}
+
 fn main() {
-    let address = SocketAddr::from(([0, 0, 0, 0], PORT));
-    let listener = TcpListener::bind(address).unwrap();
+    let app = App::new();
 
-    let current_state = ServerState::Handshake;
+    // let address = SocketAddr::from(([0, 0, 0, 0], PORT));
+    // let listener = TcpListener::bind(address).unwrap();
 
-    for stream in listener.incoming() {
-        let Ok(mut stream) = stream else {
-            eprintln!("Connection failed");
-            exit(1);
-        };
-        let mut reader = BufReader::new(&stream);
-        let Ok(packet) = get_packet_from_id(&current_state, &mut reader) else {
-            stream
-                .shutdown(Shutdown::Both)
-                .expect("Shutting down stream failed");
-            break;
-        };
+    // let current_state = ServerState::Handshake;
 
-        packet.handle(Box::new(&mut stream));
-    }
+    // for stream in listener.incoming() {
+    //     let Ok(mut stream) = stream else {
+    //         eprintln!("Connection failed");
+    //         exit(1);
+    //     };
+    //     let mut reader = BufReader::new(&stream);
+    //     let Ok(packet) = get_packet_from_id(&current_state, &mut reader) else {
+    //         stream
+    //             .shutdown(Shutdown::Both)
+    //             .expect("Shutting down stream failed");
+    //         break;
+    //     };
+
+    //     packet.handle(Box::new(&mut stream));
+    // }
 }
 
 fn get_packet_from_id<R: BufRead>(
