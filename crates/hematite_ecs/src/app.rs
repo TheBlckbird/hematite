@@ -8,7 +8,7 @@ use std::{
 use bevy_ecs::{prelude::*, schedule::ScheduleLabel, system::ScheduleSystem};
 
 use crate::{
-    plugin::{Plugin, Plugins},
+    plugin::{Plugin, PluginGroup},
     schedules::{First, Last, PostTick, PreTick, Shutdown, Startup, TickUpdate},
 };
 
@@ -124,7 +124,7 @@ impl App {
         Ok(())
     }
 
-    pub fn add_plugins(&mut self, plugins: impl Plugins) -> &mut Self {
+    pub fn add_plugins(&mut self, plugins: impl PluginGroup) -> &mut Self {
         plugins.add_to_app(self);
         self
     }

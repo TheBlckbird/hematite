@@ -23,11 +23,11 @@ pub trait Plugin {
     }
 }
 
-pub trait Plugins {
+pub trait PluginGroup {
     fn add_to_app(self, app: &mut App);
 }
 
-impl<P: Plugin + 'static> Plugins for P {
+impl<P: Plugin + 'static> PluginGroup for P {
     fn add_to_app(self, app: &mut App) {
         app.add_boxed_plugin(Box::new(self));
     }
@@ -35,7 +35,7 @@ impl<P: Plugin + 'static> Plugins for P {
 
 macro_rules! impl_plugins_tuple {
     ($($name:ident),*) => {
-        impl<$($name: Plugin + 'static),*> Plugins for ($($name,)*) {
+        impl<$($name: Plugin + 'static),*> PluginGroup for ($($name,)*) {
             #[allow(unused)]
             fn add_to_app(self, app: &mut App) {
                 #[allow(non_snake_case)]
