@@ -27,7 +27,7 @@ pub fn impl_serialize_macro(ast: &DeriveInput) -> TokenStream {
                 #(#serializables)*
             }
         }
-        Data::Enum(data_enum) => todo!("Enums are currently not supported"),
+        Data::Enum(_data_enum) => todo!("Enums are currently not supported"),
         Data::Union(_) => unimplemented!("Data Unions are not supported"),
     };
 

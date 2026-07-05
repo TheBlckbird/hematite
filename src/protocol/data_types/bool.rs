@@ -1,4 +1,4 @@
-use std::io::{self, Write};
+use std::io::{BufRead, Write};
 
 use crate::protocol::ser_de::{
     de::{self, Deserialize},
@@ -17,7 +17,7 @@ impl Serialize for bool {
 }
 
 impl Deserialize for bool {
-    fn deserialize<R: std::io::prelude::BufRead>(reader: &mut R) -> Result<Self, de::Error> {
+    fn deserialize<R: BufRead>(reader: &mut R) -> Result<Self, de::Error> {
         let mut buffer = [0; 1];
         reader.read_exact(&mut buffer).map_err(de::Error::Io)?;
 

@@ -40,7 +40,7 @@ pub fn impl_deserialize_macro(ast: &DeriveInput) -> TokenStream {
                 }
             }
         }
-        Data::Enum(data_enum) => todo!("Enums are currently not supported"),
+        Data::Enum(_data_enum) => todo!("Enums are currently not supported"),
         Data::Union(_) => unimplemented!("Data Unions are not supported"),
     };
 

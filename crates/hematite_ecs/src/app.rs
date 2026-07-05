@@ -67,6 +67,7 @@ impl App {
         }
     }
 
+    /// Adds one or more systems to the [`Schedule`] matching the provided [`ScheduleLabel`].
     pub fn add_systems<M>(
         &mut self,
         schedule: impl ScheduleLabel,
@@ -74,15 +75,26 @@ impl App {
     ) -> &mut Self {
         let mut schedules = self.world.get_resource_or_init::<Schedules>();
         schedules.add_systems(schedule, systems);
-
         self
     }
 
+    /// Inserts a new resource with the given `value`.
+    ///
+    /// Resources are "unique" data of a given type.
+    /// If you insert a resource of a type that already exists,
+    /// you will overwrite any existing data.
     pub fn insert_resource<R: Resource>(&mut self, value: R) -> &mut Self {
         self.world.insert_resource(value);
         self
     }
 
+    /// Initializes a new resource and returns the [`ComponentId`] created for it.
+    ///
+    /// If the resource already exists, nothing happens.
+    ///
+    /// The value given by the [`FromWorld::from_world`] method will be used.
+    /// Note that any resource with the [`Default`] trait automatically implements [`FromWorld`],
+    /// and those default values will be here instead.
     pub fn init_resource<R: Resource + FromWorld>(&mut self) -> &mut Self {
         self.world.init_resource::<R>();
         self
@@ -93,8 +105,8 @@ impl App {
             return Err("App::run() called multiple times".into());
         }
 
-        self.world.run_schedule(Startup);
         self.started = true;
+        self.world.run_schedule(Startup);
 
         let tick_duration = Duration::from_millis(50);
 

@@ -1,14 +1,38 @@
 use std::{
-    io::{BufRead, Write},
+    io::{self, BufRead, Write},
     ops::{Deref, DerefMut},
 };
+
+use bevy_ecs::system::ResMut;
+use tokio::{io::AsyncReadExt, net::TcpStream};
 
 use crate::protocol::ser_de::{
     de::{self, Deserialize},
     ser::{self, Serialize},
 };
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+macro_rules! deserialize_fn {
+    ($buffer:ident, $read_byte:expr) => {{
+        let mut value = 0;
+
+        for position in (0..32).step_by(7) {
+            let mut $buffer = [0; 1];
+            $read_byte.map_err(de::Error::Io)?;
+
+            let current_byte = $buffer[0];
+
+            value |= ((current_byte & 0x7F) as i32) << position;
+
+            if (current_byte & 0x80) == 0 {
+                return Ok(VarInt(value));
+            }
+        }
+
+        Err(de::Error::Message("VarInt incomplete or too large")) // [TODO] convert to custom error
+    }};
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub struct VarInt(pub i32);
 
 impl VarInt {
@@ -24,6 +48,10 @@ impl VarInt {
 
     pub fn into_inner(self) -> i32 {
         self.0
+    }
+
+    pub async fn from_socket(socket: &mut TcpStream) -> Result<Self, de::Error> {
+        deserialize_fn!(buffer, socket.read_exact(&mut buffer).await)
     }
 }
 
@@ -44,21 +72,7 @@ impl Serialize for VarInt {
 
 impl Deserialize for VarInt {
     fn deserialize<R: BufRead>(reader: &mut R) -> Result<Self, de::Error> {
-        let mut value = 0;
-
-        for position in (0..32).step_by(7) {
-            let mut buffer = [0; 1];
-            reader.read_exact(&mut buffer).map_err(de::Error::Io)?;
-            let current_byte = buffer[0];
-
-            value |= ((current_byte & 0x7F) as i32) << position;
-
-            if (current_byte & 0x80) == 0 {
-                return Ok(VarInt(value));
-            }
-        }
-
-        Err(de::Error::Message("VarInt incomplete or too large")) // [TODO] convert to custom error
+        deserialize_fn!(buffer, reader.read_exact(&mut buffer))
     }
 }
 

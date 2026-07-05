@@ -17,3 +17,7 @@ hematite_macros = { path = "crates/hematite_macros" }
 hematite_utils = { path = "crates/hematite_utils" }
 hematite_ecs = { path = "crates/hematite_ecs" }
 bevy_ecs.workspace = true
+tokio = { version = "1.52", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+flume = "0.12.0"

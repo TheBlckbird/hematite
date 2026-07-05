@@ -1,47 +1,120 @@
 use std::{
-    fmt::Debug,
-    io::{BufRead, Write},
+    hash::Hash,
+    io::{BufRead, Cursor},
 };
 
-use crate::{
-    PacketError,
-    protocol::{
-        data_types::var_int::VarInt,
-        ser_de::de::{self, Deserialize},
+use bevy_ecs::system::BoxedSystem;
+use hematite_ecs::prelude::*;
+
+use crate::protocol::{
+    packets::{
+        handshake::serverbound::Handshake,
+        status::serverbound::{ping_request::PingRequest, status_request::StatusRequest},
     },
+    ser_de::de::{self, Deserialize},
 };
 
-mod all;
 pub mod configuration;
 pub mod handshake;
 pub mod login;
 pub mod play;
 pub mod status;
 
-#[derive(Debug)]
-pub struct PacketHeader {
-    pub id: u8,
-    pub data: Vec<u8>,
+pub trait ServerboundPacket: Event {}
+
+pub trait ClientboundPacket {}
+
+pub enum ServerState {
+    Handshake,
+    Configuration,
+    Status,
+    Login,
+    Play,
 }
 
-impl Deserialize for PacketHeader {
-    fn deserialize<R: BufRead>(reader: &mut R) -> Result<Self, de::Error> {
-        let length = *VarInt::deserialize(reader)?;
-        let packet_id = VarInt::deserialize(reader)?;
-        let data_length = length as usize - packet_id.len();
+pub enum Direction {
+    Serverbound,
+    Clientbound,
+}
 
-        let mut data = vec![0; data_length];
-        reader.read_exact(&mut data).map_err(de::Error::Io)?;
+/*
+all_packets! {
+    Handshake:
+        SB {
+            Handshake = "intention",
+        }
 
-        Ok(Self {
-            id: packet_id.into_inner() as u8,
-            data,
-        })
+    Status:
+        SB {
+            PingRequest,
+            StatusRequest,
+        }
+        CB {
+            PongResponse,
+            StatusResponse,
+        }
+
+    Configuration:
+        SB {}
+        CB {}
+
+    Login:
+        SB {}
+        CB {}
+
+    Play:
+        SB {}
+        CB {}
+}
+*/
+
+// should result in:
+
+pub enum AllSBPackets {
+    Handshake(Handshake),
+    PingRequest(PingRequest),
+    StatusRequest(StatusRequest),
+    // PongResponse(PongResponse),
+    // StatusResponse(StatusResponse),
+}
+
+impl AllSBPackets {
+    pub fn from_id<R: BufRead>(
+        id: &u8,
+        server_state: &ServerState,
+        reader: &mut R,
+    ) -> Option<Result<Self, de::Error>> {
+        match (id, server_state) {
+            (0x00, ServerState::Handshake) => {
+                Some(Handshake::deserialize(reader).map(|packet| Self::Handshake(packet)))
+            }
+            (0x00, ServerState::Status) => {
+                Some(StatusRequest::deserialize(reader).map(|packet| Self::StatusRequest(packet)))
+            }
+            (0x01, ServerState::Status) => {
+                Some(PingRequest::deserialize(reader).map(|packet| Self::PingRequest(packet)))
+            }
+            _ => None,
+        }
+    }
+
+    pub fn send_event(self, mut commands: Commands) {
+        match self {
+            AllSBPackets::Handshake(handshake) => commands.trigger(handshake),
+            AllSBPackets::PingRequest(ping_request) => commands.trigger(ping_request),
+            AllSBPackets::StatusRequest(status_request) => commands.trigger(status_request),
+        }
     }
 }
 
-pub trait ServerboundPacket: Debug {
-    fn handle(&self, writer: Box<&mut dyn Write>);
-}
+pub enum AllCBPackets {}
 
-pub trait ClientboundPacket: Debug {}
+fn read_packets_channel(mut commands: Commands) {
+    let buffer = Vec::new();
+    let mut reader = Cursor::new(buffer);
+    let packet = AllSBPackets::from_id(&1, &ServerState::Configuration, &mut reader)
+        .unwrap()
+        .unwrap();
+
+    packet.send_event(commands.reborrow());
+}

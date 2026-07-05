@@ -1,6 +1,7 @@
-use std::io::{BufRead, Write};
+use std::io::BufRead;
 
-use hematite_macros::{Deserialize, PacketId};
+use hematite_ecs::prelude::*;
+use hematite_macros::Deserialize;
 
 use crate::protocol::{
     data_types::{proto_string::ProtoString, var_int::VarInt},
@@ -8,8 +9,7 @@ use crate::protocol::{
     ser_de::de::{self, Deserialize},
 };
 
-#[derive(Debug, Deserialize)]
-// #[packet_name = "intention"]
+#[derive(Debug, Deserialize, Event)]
 pub struct Handshake {
     pub protocol_version: VarInt,
     pub server_address: ProtoString<255>,
@@ -17,18 +17,11 @@ pub struct Handshake {
     pub intent: Intent,
 }
 
-impl ServerboundPacket for Handshake {
-    fn handle(&self, writer: Box<&mut dyn Write>) {
-        match self.intent {
-            Intent::Status => todo!(),
-            Intent::Login => todo!(),
-            Intent::Transfer => todo!(),
-        }
-        println!("hello from handshake");
-    }
-}
+impl Handshake {}
 
-#[derive(Debug)]
+impl ServerboundPacket for Handshake {}
+
+#[derive(Debug, Hash)]
 pub enum Intent {
     Status,
     Login,
