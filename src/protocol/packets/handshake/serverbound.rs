@@ -9,7 +9,7 @@ use crate::protocol::{
     ser_de::de::{self, Deserialize},
 };
 
-#[derive(Debug, Deserialize, Event)]
+#[derive(Debug, Deserialize, Message)]
 pub struct Handshake {
     pub protocol_version: VarInt,
     pub server_address: ProtoString<255>,

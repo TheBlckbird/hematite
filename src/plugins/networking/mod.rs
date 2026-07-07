@@ -68,6 +68,6 @@ fn read_packets(to_bevy_receiver: Res<ToBevyReceiver>, mut commands: Commands) {
             }
         };
 
-        incoming_packet.send_event(commands.reborrow());
+        commands.run_system_cached_with(AllSBPackets::send_event, incoming_packet);
     }
 }

@@ -3,7 +3,7 @@ use hematite_macros::Deserialize;
 
 use crate::protocol::packets::ServerboundPacket;
 
-#[derive(Debug, Deserialize, Event)]
+#[derive(Debug, Deserialize, Message)]
 pub struct PingRequest {
     pub timestamp: i64,
 }
