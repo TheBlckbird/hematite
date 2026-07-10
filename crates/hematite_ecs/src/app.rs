@@ -106,7 +106,7 @@ impl App {
         }
 
         self.started = true;
-        self.world.run_schedule(Startup);
+        self.world.try_run_schedule(Startup)?;
 
         let tick_duration = Duration::from_millis(50);
 
