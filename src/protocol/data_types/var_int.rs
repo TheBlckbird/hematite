@@ -1,9 +1,8 @@
 use std::{
-    io::{self, BufRead, Write},
+    io::{BufRead, Write},
     ops::{Deref, DerefMut},
 };
 
-use bevy_ecs::system::ResMut;
 use tokio::{io::AsyncReadExt, net::TcpStream};
 
 use crate::protocol::ser_de::{
