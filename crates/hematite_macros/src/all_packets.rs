@@ -212,7 +212,6 @@ pub fn impl_all_packets(input: TokenStream) -> TokenStream {
         let id = &packet.id;
         let internal_name = Ident::new(&packet.internal_name, packet.ident.span());
 
-
         match packet.direction {
             Direction::Clientbound => {
                 serializables.push(quote! {
@@ -244,9 +243,6 @@ pub fn impl_all_packets(input: TokenStream) -> TokenStream {
     }
 
     quote! {
-        pub trait ServerboundPacket: bevy_ecs::message::Message {}
-        pub trait ClientboundPacket {}
-
         pub enum ServerState {
             #(#server_states)*
         }
@@ -292,6 +288,7 @@ pub fn impl_all_packets(input: TokenStream) -> TokenStream {
             /// ```rust
             /// commands.run_system_cached_with(AllSBPackets::send_event, incoming_packet);
             /// ```
+            #[allow(clippy::too_many_arguments)]
             pub fn send_event(
                 bevy_ecs::system::In(packet): bevy_ecs::system::In<Self>,
                 #(#send_events_args)*
