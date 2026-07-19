@@ -4,16 +4,13 @@ use itertools::{Either, Itertools};
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
-    Ident, LitStr, Token,
-    parse::{Parse, ParseStream},
-    parse_macro_input,
-    punctuated::Punctuated,
+    Ident, LitStr, Token, parenthesized, parse::{Parse, ParseStream}, parse_macro_input, punctuated::Punctuated,
 };
 
 use crate::packet::Packets;
 
 struct AllPackets {
-    states: HashMap<Ident, HashMap<Direction, Vec<PacketEntry>>>,
+    states: HashMap<Ident, Group>,
 }
 
 impl Parse for AllPackets {
@@ -21,6 +18,20 @@ impl Parse for AllPackets {
         let mut states = HashMap::new();
 
         while let Ok(state_ident) = input.parse::<Ident>() {
+            let is_networking_side = if input.peek(syn::token::Paren) {
+                let content;
+                parenthesized!(content in input);
+                let flag: Ident = content.parse()?;
+
+                if flag != "networking" {
+                    return Err(syn::Error::new(flag.span(), "expected `networking`"))
+                }
+
+                true
+            } else {
+                false
+            };
+
             input.parse::<Token![:]>()?;
             let mut directions = HashMap::new();
 
@@ -35,12 +46,23 @@ impl Parse for AllPackets {
 
             input.parse::<Token![;]>()?;
 
-            states.insert(state_ident, directions);
+            let group = Group {
+                is_networking_side,
+                directions,
+            };
+
+            states.insert(state_ident, group);
         }
 
         Ok(AllPackets { states })
     }
 }
+
+struct Group {
+    is_networking_side: bool,
+    directions: HashMap<Direction, Vec<PacketEntry>>,
+}
+
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
 enum Direction {
@@ -89,6 +111,7 @@ struct PacketWithMetadata {
     id: u8,
     state: Ident,
     direction: Direction,
+    is_networking_layer: bool,
 }
 
 impl PacketWithMetadata {
@@ -98,6 +121,7 @@ impl PacketWithMetadata {
         id: u8,
         state: Ident,
         direction: Direction,
+    is_networking_layer: bool,
     ) -> Self {
         Self {
             ident,
@@ -105,6 +129,7 @@ impl PacketWithMetadata {
             id,
             state,
             direction,
+            is_networking_layer
         }
     }
 }
@@ -115,8 +140,8 @@ impl TryFrom<AllPackets> for Vec<PacketWithMetadata> {
     fn try_from(value: AllPackets) -> Result<Self, Self::Error> {
         let mut all_packets = Vec::new();
 
-        for (state, directions) in value.states.iter() {
-            for (direction, packet_group) in directions {
+        for (state, group) in value.states.iter() {
+            for (direction, packet_group) in &group.directions {
                 for packet in packet_group {
                     let Some(internal_ident) = packet
                         .internal_name
@@ -163,6 +188,7 @@ impl TryFrom<AllPackets> for Vec<PacketWithMetadata> {
                         id,
                         state.clone(),
                         *direction,
+                        group.is_networking_side
                     ));
                 }
             }
@@ -206,6 +232,7 @@ pub fn impl_all_packets(input: TokenStream) -> TokenStream {
     let mut from_ids = Vec::new();
     let mut send_events_args = Vec::new();
     let mut send_events = Vec::new();
+    let mut is_networking = Vec::new();
 
     for packet in packets_list.iter() {
         let packet_ident = &packet.ident;
@@ -226,6 +253,7 @@ pub fn impl_all_packets(input: TokenStream) -> TokenStream {
             Direction::Serverbound => {
                 let state = &packet.state;
                 let internal_name_writer = Ident::new(format!("{internal_name}_writer").as_str(), internal_name.span());
+                let is_networking_side = &packet.is_networking_layer;
 
                 from_ids.push(quote! {
                     (#id, ServerState::#state) => Some(crate::protocol::ser_de::de::Deserialize::deserialize(reader).map(Self::#packet_ident)),
@@ -237,6 +265,10 @@ pub fn impl_all_packets(input: TokenStream) -> TokenStream {
 
                 send_events.push(quote! {
                     Self::#packet_ident(#internal_name) => {#internal_name_writer.write(#internal_name);}
+                });
+
+                is_networking.push(quote! {
+                    Self::#packet_ident(_) => #is_networking_side,
                 });
             }
         }
@@ -281,7 +313,6 @@ pub fn impl_all_packets(input: TokenStream) -> TokenStream {
                     _ => None,
                 }
             }
-
             
             /// Can be run as a one shot system:
             ///
@@ -295,6 +326,12 @@ pub fn impl_all_packets(input: TokenStream) -> TokenStream {
             ) {
                 match packet {
                     #(#send_events)*
+                }
+            }
+
+            pub fn is_networking_side(&self) -> bool {
+                match self {
+                    #(#is_networking)*
                 }
             }
         }
