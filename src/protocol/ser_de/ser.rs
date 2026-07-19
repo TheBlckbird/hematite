@@ -18,4 +18,6 @@ pub enum Error {
     },
     #[error("IO Error: {0}")]
     Io(io::Error),
+    #[error("NBT Error: {0}")]
+    Nbt(crab_nbt::error::Error),
 }

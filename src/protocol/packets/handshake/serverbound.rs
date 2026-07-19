@@ -5,7 +5,6 @@ use hematite_macros::Deserialize;
 
 use crate::protocol::{
     data_types::{proto_string::ProtoString, var_int::VarInt},
-    packets::ServerboundPacket,
     ser_de::de::{self, Deserialize},
 };
 
@@ -16,10 +15,6 @@ pub struct Handshake {
     pub server_port: u16,
     pub intent: Intent,
 }
-
-impl Handshake {}
-
-impl ServerboundPacket for Handshake {}
 
 #[derive(Debug, Hash)]
 pub enum Intent {

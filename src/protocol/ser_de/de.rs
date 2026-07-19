@@ -31,4 +31,6 @@ pub enum Error {
         actual: usize,
         context: &'static str,
     },
+    #[error("NBT Error: {0}")]
+    Nbt(crab_nbt::error::Error),
 }
