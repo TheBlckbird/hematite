@@ -108,7 +108,7 @@ impl App {
         self.started = true;
         self.world.try_run_schedule(Startup)?;
 
-        let tick_duration = Duration::from_millis(50);
+        let tick_length = Duration::from_millis(50);
 
         loop {
             let tick_start = Instant::now();
@@ -123,10 +123,10 @@ impl App {
                 break;
             }
 
-            let delta_time = Instant::now() - tick_start;
+            let elapsed_time = Instant::now() - tick_start;
 
-            if delta_time < tick_duration {
-                let sleep_time = tick_duration - delta_time;
+            if elapsed_time < tick_length {
+                let sleep_time = tick_length - elapsed_time;
                 sleep(sleep_time);
             }
         }
