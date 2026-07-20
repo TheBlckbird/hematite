@@ -2,9 +2,13 @@ use std::collections::HashMap;
 
 use itertools::{Either, Itertools};
 use proc_macro::TokenStream;
+use proc_macro2::Span;
 use quote::quote;
 use syn::{
-    Ident, LitStr, Token, parenthesized, parse::{Parse, ParseStream}, parse_macro_input, punctuated::Punctuated,
+    Ident, LitStr, Token, parenthesized,
+    parse::{Parse, ParseStream},
+    parse_macro_input,
+    punctuated::Punctuated,
 };
 
 use crate::packet::Packets;
@@ -24,7 +28,7 @@ impl Parse for AllPackets {
                 let flag: Ident = content.parse()?;
 
                 if flag != "networking" {
-                    return Err(syn::Error::new(flag.span(), "expected `networking`"))
+                    return Err(syn::Error::new(flag.span(), "expected `networking`"));
                 }
 
                 true
@@ -62,7 +66,6 @@ struct Group {
     is_networking_side: bool,
     directions: HashMap<Direction, Vec<PacketEntry>>,
 }
-
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
 enum Direction {
@@ -121,7 +124,7 @@ impl PacketWithMetadata {
         id: u8,
         state: Ident,
         direction: Direction,
-    is_networking_layer: bool,
+        is_networking_layer: bool,
     ) -> Self {
         Self {
             ident,
@@ -129,7 +132,7 @@ impl PacketWithMetadata {
             id,
             state,
             direction,
-            is_networking_layer
+            is_networking_layer,
         }
     }
 }
@@ -188,7 +191,7 @@ impl TryFrom<AllPackets> for Vec<PacketWithMetadata> {
                         id,
                         state.clone(),
                         *direction,
-                        group.is_networking_side
+                        group.is_networking_side,
                     ));
                 }
             }
@@ -214,25 +217,49 @@ pub fn impl_all_packets(input: TokenStream) -> TokenStream {
         Err(error) => return error,
     };
 
-    let (all_clientbound_packets, all_serverbound_packets): (Vec<_>, Vec<_>) =
-        packets_list.iter().partition_map(|packet| {
+    let (all_clientbound_packets, all_serverbound_packets): (Vec<_>, Vec<_>) = packets_list
+        .iter()
+        .partition_map(|packet| match packet.direction {
+            Direction::Clientbound => Either::Left(packet),
+            Direction::Serverbound => Either::Right(packet),
+        });
+
+    let (networking_clientbound, engine_clientbound): (Vec<_>, Vec<_>) =
+        all_clientbound_packets.iter().partition_map(|packet| {
             let packet_ident = &packet.ident;
             let generated = quote! {
                 #packet_ident(#packet_ident),
             };
 
-            match packet.direction {
-                Direction::Clientbound => Either::Left(generated),
-                Direction::Serverbound => Either::Right(generated),
+            match packet.is_networking_layer {
+                true => Either::Left(generated),
+                false => Either::Right(generated),
+            }
+        });
+
+    let (networking_serverbound, engine_serverbound): (Vec<_>, Vec<_>) =
+        all_serverbound_packets.iter().partition_map(|packet| {
+            let packet_ident = &packet.ident;
+            let generated = quote! {
+                #packet_ident(#packet_ident),
+            };
+
+            match packet.is_networking_layer {
+                true => Either::Left(generated),
+                false => Either::Right(generated),
             }
         });
 
     let mut get_ids = Vec::new();
-    let mut serializables = Vec::new();
+    let mut engine_serializables = Vec::new();
     let mut from_ids = Vec::new();
     let mut send_events_args = Vec::new();
     let mut send_events = Vec::new();
-    let mut is_networking = Vec::new();
+
+    let engine_serverbound_ident = Ident::new("EngineSBPackets", Span::call_site());
+    let engine_clientbound_ident = Ident::new("EngineCBPackets", Span::call_site());
+    let networking_serverbound_ident = Ident::new("NetworkingSBPackets", Span::call_site());
+    let networking_clientbound_ident = Ident::new("NetworkingCBPackets", Span::call_site());
 
     for packet in packets_list.iter() {
         let packet_ident = &packet.ident;
@@ -241,35 +268,57 @@ pub fn impl_all_packets(input: TokenStream) -> TokenStream {
 
         match packet.direction {
             Direction::Clientbound => {
-                serializables.push(quote! {
-                    Self::#packet_ident(#internal_name) => crate::protocol::ser_de::ser::Serialize::serialize(#internal_name, writer),
-                });
+                if packet.is_networking_layer {
+                    get_ids.push(quote! {
+                        Self::Networking(#networking_clientbound_ident::#packet_ident(_)) => #id,
+                    });
 
-                get_ids.push(quote! {
-                    Self::#packet_ident(_) => #id,
-                });
+                    engine_serializables.push(quote! {
+                        Self::Networking(#networking_clientbound_ident::#packet_ident(#internal_name)) => crate::protocol::ser_de::ser::Serialize::serialize(#internal_name, writer),
+                    });
+                } else {
+                    get_ids.push(quote! {
+                        Self::Engine(#engine_clientbound_ident::#packet_ident(_)) => #id,
+                    });
+
+                    engine_serializables.push(quote! {
+                        Self::Engine(#engine_clientbound_ident::#packet_ident(#internal_name)) => crate::protocol::ser_de::ser::Serialize::serialize(#internal_name, writer),
+                    });
+                }
             }
 
             Direction::Serverbound => {
                 let state = &packet.state;
-                let internal_name_writer = Ident::new(format!("{internal_name}_writer").as_str(), internal_name.span());
-                let is_networking_side = &packet.is_networking_layer;
+                let internal_name_writer = Ident::new(
+                    format!("{internal_name}_writer").as_str(),
+                    internal_name.span(),
+                );
 
-                from_ids.push(quote! {
-                    (#id, ServerState::#state) => Some(crate::protocol::ser_de::de::Deserialize::deserialize(reader).map(Self::#packet_ident)),
-                });
+                if packet.is_networking_layer {
+                    from_ids.push(quote! {
+                        (#id, ServerState::#state) => Some(
+                            crate::protocol::ser_de::de::Deserialize::deserialize(reader)
+                                .map(#networking_serverbound_ident::#packet_ident)
+                                .map(Self::Networking)
+                        ),
+                    });
+                } else {
+                    from_ids.push(quote! {
+                        (#id, ServerState::#state) => Some(
+                            crate::protocol::ser_de::de::Deserialize::deserialize(reader)
+                                .map(#engine_serverbound_ident::#packet_ident)
+                                .map(Self::Engine)
+                        ),
+                    });
 
-                send_events_args.push(quote! {
-                    mut #internal_name_writer: bevy_ecs::message::MessageWriter<#packet_ident>,
-                });
+                    send_events_args.push(quote! {
+                        mut #internal_name_writer: bevy_ecs::message::MessageWriter<#packet_ident>,
+                    });
 
-                send_events.push(quote! {
-                    Self::#packet_ident(#internal_name) => {#internal_name_writer.write(#internal_name);}
-                });
-
-                is_networking.push(quote! {
-                    Self::#packet_ident(_) => #is_networking_side,
-                });
+                    send_events.push(quote! {
+                        Self::#packet_ident(#internal_name) => {#internal_name_writer.write(#internal_name);}
+                    });
+                }
             }
         }
     }
@@ -279,11 +328,12 @@ pub fn impl_all_packets(input: TokenStream) -> TokenStream {
             #(#server_states)*
         }
 
-        pub enum AllCBPackets {
-            #(#all_clientbound_packets)*
+        pub enum RoutedCBPacket {
+            Networking(#networking_clientbound_ident),
+            Engine(#engine_clientbound_ident),
         }
 
-        impl AllCBPackets {
+        impl RoutedCBPacket {
             pub fn get_id(&self) -> u8 {
                 match self {
                     #(#get_ids)*
@@ -293,16 +343,25 @@ pub fn impl_all_packets(input: TokenStream) -> TokenStream {
             pub fn serialize<W: std::io::Write>(&self, writer: &mut W) -> Result<(), crate::protocol::ser_de::ser::Error> {
                 #[allow(non_snake_case)]
                 match self {
-                    #(#serializables)*
+                    #(#engine_serializables)*
                 }
             }
         }
 
-        pub enum AllSBPackets {
-            #(#all_serverbound_packets)*
+        pub enum #engine_clientbound_ident {
+            #(#engine_clientbound)*
         }
 
-        impl AllSBPackets {
+        pub enum #networking_clientbound_ident {
+            #(#networking_clientbound)*
+        }
+
+        pub enum RoutedSBPacket {
+            Networking(#networking_serverbound_ident),
+            Engine(#engine_serverbound_ident),
+        }
+
+        impl RoutedSBPacket {
             pub fn from_id<R: std::io::BufRead>(
                 id: &u8,
                 server_state: &ServerState,
@@ -313,7 +372,13 @@ pub fn impl_all_packets(input: TokenStream) -> TokenStream {
                     _ => None,
                 }
             }
-            
+        }
+
+        pub enum #engine_serverbound_ident {
+            #(#engine_serverbound)*
+        }
+
+        impl #engine_serverbound_ident {
             /// Can be run as a one shot system:
             ///
             /// ```rust
@@ -328,12 +393,10 @@ pub fn impl_all_packets(input: TokenStream) -> TokenStream {
                     #(#send_events)*
                 }
             }
+        }
 
-            pub fn is_networking_side(&self) -> bool {
-                match self {
-                    #(#is_networking)*
-                }
-            }
+        pub enum #networking_serverbound_ident {
+            #(#networking_serverbound)*
         }
     }
     .into()

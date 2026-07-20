@@ -1,6 +1,3 @@
-mod bevy_side;
-mod disconnect_client;
-
 use std::io::{self, Cursor, Read};
 
 use flume::{Receiver, Sender};
@@ -14,10 +11,17 @@ use crate::{
     },
     protocol::{
         data_types::var_int::VarInt,
-        packets::{AllCBPackets, AllSBPackets, ServerState},
+        packets::{
+            EngineCBPackets, EngineSBPackets, NetworkingSBPackets, RoutedSBPacket, ServerState,
+        },
         ser_de::de::{self, Deserialize},
     },
 };
+
+mod bevy_side;
+mod disconnect_client;
+mod handle_handshake;
+mod handle_login;
 
 struct RawPacket {
     id: u8,
@@ -34,16 +38,14 @@ impl RawPacket {
 enum PacketError {
     #[error("{0}")]
     Deserialization(de::Error),
-    #[error("Unknown packet id {0}")]
-    UnknownId(u8),
     #[error("{0}")]
     Io(io::Error),
 }
 
 pub async fn handle_client(
     mut socket: TcpStream,
-    to_bevy_tx: Sender<AllSBPackets>,
-    to_networking_rx: Receiver<AllCBPackets>,
+    to_bevy_tx: Sender<EngineSBPackets>,
+    _to_networking_rx: Receiver<EngineCBPackets>,
 ) {
     let current_state = ServerState::Handshake;
 
@@ -58,7 +60,7 @@ pub async fn handle_client(
 
         let mut reader = Cursor::new(header.buffer);
 
-        let packet = match AllSBPackets::from_id(&header.id, &current_state, &mut reader) {
+        let packet = match RoutedSBPacket::from_id(&header.id, &current_state, &mut reader) {
             Some(Ok(packet)) => packet,
             None => {
                 disconnect_client_msg(socket, format!("Unknown id {}", header.id)).await;
@@ -70,10 +72,22 @@ pub async fn handle_client(
             }
         };
 
-        let transmit_result = to_bevy_tx.send_async(packet).await;
-        if let Err(error) = transmit_result {
-            error!("Couldn't transmit packet to bevy {error}");
+        match packet {
+            RoutedSBPacket::Networking(packet) => handle_networking_packet(packet).await,
+            RoutedSBPacket::Engine(packet) => handle_engine_packet(packet, &to_bevy_tx).await,
         }
+    }
+}
+
+async fn handle_networking_packet(packet: NetworkingSBPackets) {
+    todo!()
+}
+
+async fn handle_engine_packet(packet: EngineSBPackets, to_bevy_tx: &Sender<EngineSBPackets>) {
+    let transmit_result = to_bevy_tx.send_async(packet).await;
+
+    if let Err(error) = transmit_result {
+        error!("Couldn't transmit packet to bevy {error}");
     }
 }
 
