@@ -35,7 +35,7 @@ macro_rules! deserialize_fn {
 pub struct VarInt(pub i32);
 
 impl VarInt {
-    pub fn len(&self) -> usize {
+    pub fn size(&self) -> usize {
         if self.is_positive() {
             let len = 32 - self.leading_zeros();
             (len as f32 / 7.0).ceil() as usize
