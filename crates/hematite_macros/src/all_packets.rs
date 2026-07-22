@@ -171,7 +171,7 @@ impl TryFrom<AllPackets> for Vec<PacketWithMetadata> {
                         format!("minecraft:{internal_ident}")
                     };
 
-                    let Some(id) = find_protocol_id(&internal_name) else {
+                    let Some(id) = find_protocol_id(&internal_name, direction) else {
                         let span = match &packet.internal_name {
                             Some(internal_name) => internal_name.span(),
                             None => packet.ident.span(),
@@ -382,7 +382,7 @@ pub fn impl_all_packets(input: TokenStream) -> TokenStream {
             /// Can be run as a one shot system:
             ///
             /// ```rust
-            /// commands.run_system_cached_with(AllSBPackets::send_event, incoming_packet);
+            /// commands.run_system_cached_with(EngineSBPackets::send_event, incoming_packet);
             /// ```
             #[allow(clippy::too_many_arguments)]
             pub fn send_event(
@@ -402,20 +402,19 @@ pub fn impl_all_packets(input: TokenStream) -> TokenStream {
     .into()
 }
 
-fn find_protocol_id(packet_name: &str) -> Option<u8> {
+fn find_protocol_id(packet_name: &str, direction: &Direction) -> Option<u8> {
     let packet_states: Packets = serde_json::from_str(include_str!("packet/packets.json"))
         .expect("Unexpected format of packets.json file.");
 
     for sides in packet_states.into_values() {
-        for (name, packet) in sides.clientbound.iter().flatten() {
+        let direction_packets = match direction {
+            Direction::Clientbound => sides.clientbound,
+            Direction::Serverbound => sides.serverbound,
+        };
+
+        for (name, packet) in direction_packets.iter().flatten() {
             if name == packet_name {
                 return Some(packet.protocol_id);
-            }
-        }
-
-        for (name, info) in sides.serverbound.iter().flatten() {
-            if name == packet_name {
-                return Some(info.protocol_id);
             }
         }
     }
