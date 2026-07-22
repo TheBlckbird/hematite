@@ -1,5 +1,9 @@
 use crate::protocol::packets::{
     handshake::serverbound::Handshake,
+    login::{
+        clientbound::{CookieRequest, LoginDisconnect, LoginPluginRequest, LoginSuccess},
+        serverbound::{CookieResponse, LoginAcknowledged, LoginPluginResponse, LoginStart},
+    },
     status::{
         clientbound::{ping_response::PongResponse, status_response::StatusResponse},
         serverbound::{ping_request::PingRequest, status_request::StatusRequest},
@@ -15,7 +19,7 @@ pub mod play;
 pub mod status;
 
 all_packets! {
-    Handshake:
+    Handshake (networking):
         SB {
             Handshake = "intention",
         };
@@ -34,9 +38,19 @@ all_packets! {
         SB {}
         CB {};
 
-    Login:
-        SB {}
-        CB {};
+    Login (networking):
+        SB {
+            LoginStart = "hello",
+            LoginPluginResponse = "custom_query_answer",
+            LoginAcknowledged,
+            CookieResponse,
+        }
+        CB {
+            LoginDisconnect,
+            LoginSuccess = "login_finished",
+            LoginPluginRequest = "custom_query",
+            CookieRequest,
+        };
 
     Play:
         SB {}

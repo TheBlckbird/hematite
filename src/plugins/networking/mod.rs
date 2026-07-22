@@ -9,15 +9,18 @@ use flume::{Receiver, Sender};
 use hematite_ecs::prelude::*;
 use tracing::error;
 
-use crate::protocol::packets::{AllCBPackets, AllSBPackets};
+use crate::protocol::packets::{EngineCBPackets, EngineSBPackets};
 
 pub struct NetworkingPlugin {
-    to_bevy_rx: Receiver<AllSBPackets>,
-    to_networking_tx: Sender<AllCBPackets>,
+    to_bevy_rx: Receiver<EngineSBPackets>,
+    to_networking_tx: Sender<EngineCBPackets>,
 }
 
 impl NetworkingPlugin {
-    pub fn new(to_bevy_rx: Receiver<AllSBPackets>, to_networking_tx: Sender<AllCBPackets>) -> Self {
+    pub fn new(
+        to_bevy_rx: Receiver<EngineSBPackets>,
+        to_networking_tx: Sender<EngineCBPackets>,
+    ) -> Self {
         Self {
             to_bevy_rx,
             to_networking_tx,
@@ -41,19 +44,19 @@ const ADDRESS: IpAddr = IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0));
 // MARK: Resources
 
 #[derive(Resource, Deref)]
-pub struct ToBevyReceiver(Receiver<AllSBPackets>);
+pub struct ToBevyReceiver(Receiver<EngineSBPackets>);
 
 impl ToBevyReceiver {
-    pub fn new(rx: Receiver<AllSBPackets>) -> Self {
+    pub fn new(rx: Receiver<EngineSBPackets>) -> Self {
         Self(rx)
     }
 }
 
 #[derive(Resource, Deref)]
-pub struct ToNetworkingSender(Sender<AllCBPackets>);
+pub struct ToNetworkingSender(Sender<EngineCBPackets>);
 
 impl ToNetworkingSender {
-    pub fn new(tx: Sender<AllCBPackets>) -> Self {
+    pub fn new(tx: Sender<EngineCBPackets>) -> Self {
         Self(tx)
     }
 }
@@ -68,6 +71,6 @@ fn read_packets(to_bevy_receiver: Res<ToBevyReceiver>, mut commands: Commands) {
             }
         };
 
-        commands.run_system_cached_with(AllSBPackets::send_event, incoming_packet);
+        commands.run_system_cached_with(EngineSBPackets::send_event, incoming_packet);
     }
 }

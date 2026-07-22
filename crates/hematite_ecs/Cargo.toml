@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 variadics_please = "2.0"
 bevy_ecs.workspace = true
+anyhow.workspace = true

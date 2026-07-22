@@ -1,28 +1,40 @@
-use std::io::{self, Cursor, Read};
+use std::io::{self, Cursor, Read, Write};
 
+use anyhow::Context;
 use flume::{Receiver, Sender};
 use thiserror::Error;
-use tokio::{io::AsyncReadExt, net::TcpStream};
-use tracing::error;
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::TcpStream,
+};
+use tracing::{error, info};
 
 use crate::{
-    plugins::networking::handler::disconnect_client::{
-        disconnect_client_err, disconnect_client_msg,
+    plugins::networking::{
+        handler::{
+            disconnect_client::{disconnect_client_err, disconnect_client_msg},
+            handle_login::handle_login_start,
+        },
+        handshake::handle_handshake,
     },
     protocol::{
         data_types::var_int::VarInt,
         packets::{
-            EngineCBPackets, EngineSBPackets, NetworkingSBPackets, RoutedSBPacket, ServerState,
+            EngineCBPackets, EngineSBPackets, NetworkingSBPackets, RoutedCBPacket, RoutedSBPacket,
+            ServerState,
         },
-        ser_de::de::{self, Deserialize},
+        ser_de::{
+            de::{self, Deserialize},
+            ser::{self, Serialize},
+        },
     },
 };
 
 mod bevy_side;
 mod disconnect_client;
-mod handle_handshake;
 mod handle_login;
 
+#[derive(Debug)]
 struct RawPacket {
     id: u8,
     buffer: Vec<u8>,
@@ -31,6 +43,28 @@ struct RawPacket {
 impl RawPacket {
     fn new(id: u8, buffer: Vec<u8>) -> Self {
         Self { id, buffer }
+    }
+
+    async fn send_via_socket(&self, socket: &mut TcpStream) -> anyhow::Result<()> {
+        let mut writer = Vec::new();
+        self.serialize(&mut writer).context("Error serializing")?;
+        socket
+            .write_all(&writer)
+            .await
+            .context("Error writing to socket")?;
+
+        Ok(())
+    }
+}
+
+impl Serialize for RawPacket {
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), ser::Error> {
+        let length = VarInt((self.buffer.len() + size_of::<u8>()) as i32);
+        length.serialize(writer)?;
+        self.id.serialize(writer)?;
+        writer.write_all(&self.buffer).map_err(ser::Error::Io)?;
+
+        Ok(())
     }
 }
 
@@ -47,7 +81,8 @@ pub async fn handle_client(
     to_bevy_tx: Sender<EngineSBPackets>,
     _to_networking_rx: Receiver<EngineCBPackets>,
 ) {
-    let current_state = ServerState::Handshake;
+    let mut server_state = ServerState::Handshake;
+    let mut player_profile = None;
 
     loop {
         let header = match get_raw_packet(&mut socket).await {
@@ -60,7 +95,7 @@ pub async fn handle_client(
 
         let mut reader = Cursor::new(header.buffer);
 
-        let packet = match RoutedSBPacket::from_id(&header.id, &current_state, &mut reader) {
+        let packet = match RoutedSBPacket::from_id(&header.id, &server_state, &mut reader) {
             Some(Ok(packet)) => packet,
             None => {
                 disconnect_client_msg(socket, format!("Unknown id {}", header.id)).await;
@@ -73,14 +108,28 @@ pub async fn handle_client(
         };
 
         match packet {
-            RoutedSBPacket::Networking(packet) => handle_networking_packet(packet).await,
+            RoutedSBPacket::Networking(packet) => match packet {
+                NetworkingSBPackets::Handshake(handshake) => {
+                    handle_handshake(handshake, &mut server_state);
+                }
+                NetworkingSBPackets::LoginStart(login_start) => {
+                    player_profile = Some(handle_login_start(login_start, &mut socket).await);
+                }
+                NetworkingSBPackets::LoginPluginResponse(_login_plugin_response) => todo!(),
+                NetworkingSBPackets::LoginAcknowledged(_) => {
+                    info!(
+                        "Client joined: {}",
+                        player_profile
+                            .as_ref()
+                            .expect("Player Profile should be set in this step")
+                    );
+                    server_state = ServerState::Configuration;
+                }
+                NetworkingSBPackets::CookieResponse(_cookie_response) => todo!(),
+            },
             RoutedSBPacket::Engine(packet) => handle_engine_packet(packet, &to_bevy_tx).await,
         }
     }
-}
-
-async fn handle_networking_packet(packet: NetworkingSBPackets) {
-    todo!()
 }
 
 async fn handle_engine_packet(packet: EngineSBPackets, to_bevy_tx: &Sender<EngineSBPackets>) {
@@ -111,4 +160,11 @@ async fn get_raw_packet(socket: &mut TcpStream) -> Result<RawPacket, PacketError
     Read::read_to_end(&mut reader, &mut remaining).map_err(PacketError::Io)?;
 
     Ok(RawPacket::new(id, remaining))
+}
+
+fn into_raw_packet(packet: RoutedCBPacket) -> RawPacket {
+    let mut writer = Vec::new();
+    packet.serialize(&mut writer).unwrap();
+
+    RawPacket::new(packet.get_id(), writer)
 }

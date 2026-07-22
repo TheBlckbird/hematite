@@ -1,4 +1,7 @@
-use std::io::{BufRead, Write};
+use std::{
+    fmt::Display,
+    io::{BufRead, Write},
+};
 
 use derive_more::{Deref, DerefMut};
 
@@ -99,6 +102,12 @@ impl<const MAX_LEN: usize> Deserialize for ProtoString<MAX_LEN> {
         let value = String::from_utf8(byte_buffer).map_err(de::Error::FromUtf8Error)?;
 
         Ok(Self::new(value))
+    }
+}
+
+impl<const MAX_LEN: usize> Display for ProtoString<MAX_LEN> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 

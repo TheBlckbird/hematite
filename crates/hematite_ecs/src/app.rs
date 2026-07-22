@@ -1,10 +1,10 @@
 use std::{
     collections::HashSet,
-    error::Error,
     thread::sleep,
     time::{Duration, Instant},
 };
 
+use anyhow::{Context, bail};
 use bevy_ecs::{prelude::*, schedule::ScheduleLabel, system::ScheduleSystem};
 
 use crate::{
@@ -100,24 +100,36 @@ impl App {
         self
     }
 
-    pub fn run(&mut self) -> Result<(), Box<dyn Error>> {
+    pub fn run(&mut self) -> anyhow::Result<()> {
         if self.started {
-            return Err("App::run() called multiple times".into());
+            bail!("App::run() called multiple times");
         }
 
         self.started = true;
-        self.world.try_run_schedule(Startup)?;
+        self.world
+            .try_run_schedule(Startup)
+            .context("Error adding schedule")?;
 
         let tick_length = Duration::from_millis(50);
 
         loop {
             let tick_start = Instant::now();
 
-            self.world.try_run_schedule(First)?;
-            self.world.try_run_schedule(PreTick)?;
-            self.world.try_run_schedule(TickUpdate)?;
-            self.world.try_run_schedule(PostTick)?;
-            self.world.try_run_schedule(Last)?;
+            self.world
+                .try_run_schedule(First)
+                .context("Error adding schedule")?;
+            self.world
+                .try_run_schedule(PreTick)
+                .context("Error adding schedule")?;
+            self.world
+                .try_run_schedule(TickUpdate)
+                .context("Error adding schedule")?;
+            self.world
+                .try_run_schedule(PostTick)
+                .context("Error adding schedule")?;
+            self.world
+                .try_run_schedule(Last)
+                .context("Error adding schedule")?;
 
             if self.world.resource::<ShutdownFlag>().is_set() {
                 break;
@@ -131,7 +143,9 @@ impl App {
             }
         }
 
-        self.world.try_run_schedule(Shutdown)?;
+        self.world
+            .try_run_schedule(Shutdown)
+            .context("Error adding schedule")?;
 
         Ok(())
     }

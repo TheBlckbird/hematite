@@ -6,12 +6,12 @@ use tracing::{error, info};
 
 use crate::{
     plugins::networking::{ADDRESS, PORT, handler::handle_client},
-    protocol::packets::{AllCBPackets, AllSBPackets},
+    protocol::packets::{EngineCBPackets, EngineSBPackets},
 };
 
 pub async fn run_server(
-    to_bevy_tx: Sender<AllSBPackets>,
-    to_networking_rx: Receiver<AllCBPackets>,
+    to_bevy_tx: Sender<EngineSBPackets>,
+    to_networking_rx: Receiver<EngineCBPackets>,
 ) {
     let address = SocketAddr::new(ADDRESS, PORT);
     let Ok(listener) = TcpListener::bind(address).await else {

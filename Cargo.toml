@@ -8,6 +8,7 @@ members = [".", "crates/*"]
 
 [workspace.dependencies]
 bevy_ecs = "0.19"
+anyhow = "1.0"
 
 [dependencies]
 derive_more = { version = "2.1", features = ["deref", "deref_mut"] }
@@ -19,5 +20,7 @@ hematite_ecs = { path = "crates/hematite_ecs" }
 bevy_ecs.workspace = true
 tokio = { version = "1.52", features = ["full"] }
 tracing = "0.1"
-tracing-subscriber = "0.3"
-flume = "0.12.0"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+flume = "0.12"
+crab_nbt = "0.2"
+anyhow.workspace = true
