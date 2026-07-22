@@ -16,7 +16,7 @@ pub enum Error {
     #[error("Too few bytes; expected {expected}, actual {actual}")]
     TooFewBytes { expected: usize, actual: usize },
     #[error("Syntax error")]
-    Snytax,
+    Syntax,
     #[error("Unsupported type {0}")]
     Unsupported(&'static str),
     #[error("IO Error: {0}")]

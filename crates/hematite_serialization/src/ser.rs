@@ -20,4 +20,6 @@ pub enum Error {
     Io(io::Error),
     #[error("NBT Error: {0}")]
     Nbt(crab_nbt::error::Error),
+    #[error("Syntax error")]
+    Syntax,
 }

@@ -24,7 +24,7 @@ impl Deserialize for bool {
         match buffer[0] {
             0x00 => Ok(false),
             0x01 => Ok(true),
-            _ => Err(de::Error::Snytax),
+            _ => Err(de::Error::Syntax),
         }
     }
 }

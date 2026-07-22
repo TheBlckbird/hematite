@@ -32,7 +32,7 @@ impl Deserialize for Intent {
             1 => Ok(Self::Status),
             2 => Ok(Self::Login),
             3 => Ok(Self::Transfer),
-            _ => Err(de::Error::Snytax),
+            _ => Err(de::Error::Syntax),
         }
     }
 }
