@@ -2,6 +2,11 @@ use std::io::{self, Cursor, Read, Write};
 
 use anyhow::Context;
 use flume::{Receiver, Sender};
+use hematite_serialization::{
+    builtin_types::var_int::VarInt,
+    de::{self, Deserialize},
+    ser::{self, Serialize},
+};
 use thiserror::Error;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -17,16 +22,9 @@ use crate::{
         },
         handshake::handle_handshake,
     },
-    protocol::{
-        data_types::var_int::VarInt,
-        packets::{
-            EngineCBPackets, EngineSBPackets, NetworkingSBPackets, RoutedCBPacket, RoutedSBPacket,
-            ServerState,
-        },
-        ser_de::{
-            de::{self, Deserialize},
-            ser::{self, Serialize},
-        },
+    protocol::packets::{
+        EngineCBPackets, EngineSBPackets, NetworkingSBPackets, RoutedCBPacket, RoutedSBPacket,
+        ServerState,
     },
 };
 

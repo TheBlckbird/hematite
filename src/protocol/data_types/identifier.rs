@@ -3,13 +3,12 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use crate::protocol::{
-    data_types::proto_string::ProtoString,
-    ser_de::{
-        de::{self, Deserialize},
-        ser::{self, Serialize},
-    },
+use hematite_serialization::{
+    de::{self, Deserialize},
+    ser::{self, Serialize},
 };
+
+use crate::protocol::data_types::proto_string::ProtoString;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Identifier(ProtoString);

@@ -1,11 +1,9 @@
 use std::io::{BufRead, Write};
 
-use crate::protocol::{
-    data_types::var_int::VarInt,
-    ser_de::{
-        de::{self, Deserialize},
-        ser::{self, Serialize},
-    },
+use crate::{
+    builtin_types::var_int::VarInt,
+    de::{self, Deserialize},
+    ser::{self, Serialize},
 };
 
 macro_rules! impl_prefixed_array_ser_de {

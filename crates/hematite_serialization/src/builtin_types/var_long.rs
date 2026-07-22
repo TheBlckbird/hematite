@@ -2,7 +2,7 @@ use std::io::{BufRead, Write};
 
 use derive_more::{Deref, DerefMut};
 
-use crate::protocol::ser_de::{
+use crate::{
     de::{self, Deserialize},
     ser::{self, Serialize},
 };

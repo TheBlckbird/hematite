@@ -1,9 +1,10 @@
 use bevy_ecs::message::Message;
 use hematite_macros::Deserialize;
+use hematite_serialization::builtin_types::var_int::VarInt;
 use uuid::Uuid;
 
 use crate::protocol::data_types::{
-    array::Array, identifier::Identifier, proto_string::ProtoString, var_int::VarInt,
+    array::Array, identifier::Identifier, proto_string::ProtoString,
 };
 
 #[derive(Debug, Deserialize, Message)]

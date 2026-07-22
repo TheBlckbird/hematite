@@ -9,18 +9,24 @@ members = [".", "crates/*"]
 [workspace.dependencies]
 bevy_ecs = "0.19"
 anyhow = "1.0"
+thiserror = "2.0"
+crab_nbt = "0.2"
+uuid = { version = "1.23", features = ["v3", "v4", "v7"] }
+derive_more = { version = "2.1", features = ["deref", "deref_mut"] }
+tokio = { version = "1.52", features = ["full"] }
 
 [dependencies]
-derive_more = { version = "2.1", features = ["deref", "deref_mut"] }
-thiserror = "2.0"
-uuid = { version = "1.23", features = ["v3", "v4", "v7"] }
+derive_more.workspace = true
+thiserror.workspace = true
 hematite_macros = { path = "crates/hematite_macros" }
 hematite_utils = { path = "crates/hematite_utils" }
 hematite_ecs = { path = "crates/hematite_ecs" }
+tokio.workspace = true
 bevy_ecs.workspace = true
-tokio = { version = "1.52", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 flume = "0.12"
-crab_nbt = "0.2"
 anyhow.workspace = true
+crab_nbt.workspace = true
+hematite_serialization = { path = "crates/hematite_serialization" }
+uuid.workspace = true

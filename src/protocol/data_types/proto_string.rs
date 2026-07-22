@@ -4,13 +4,10 @@ use std::{
 };
 
 use derive_more::{Deref, DerefMut};
-
-use crate::protocol::{
-    data_types::var_int::VarInt,
-    ser_de::{
-        de::{self, Deserialize},
-        ser::{self, Serialize},
-    },
+use hematite_serialization::{
+    builtin_types::var_int::VarInt,
+    de::{self, Deserialize},
+    ser::{self, Serialize},
 };
 
 const DEFAULT_MAX_LEN: usize = 32_767;

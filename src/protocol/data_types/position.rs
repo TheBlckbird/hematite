@@ -1,12 +1,11 @@
 use std::io::{BufRead, Write};
 
-use crate::{
-    core::position::Position,
-    protocol::ser_de::{
-        de::{self, Deserialize},
-        ser::{self, Serialize},
-    },
+use hematite_serialization::{
+    de::{self, Deserialize},
+    ser::{self, Serialize},
 };
+
+use crate::core::position::Position;
 
 impl Serialize for Position {
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), ser::Error> {

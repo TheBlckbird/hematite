@@ -3,7 +3,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use crate::protocol::ser_de::{
+use hematite_serialization::{
     de::{self, Deserialize},
     ser::{self, Serialize},
 };

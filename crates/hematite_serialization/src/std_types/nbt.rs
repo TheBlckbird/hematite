@@ -2,7 +2,7 @@ use std::io::{BufRead, Write};
 
 use crab_nbt::{Nbt, NbtTag};
 
-use crate::protocol::ser_de::{
+use crate::{
     de::{self, Deserialize},
     ser::{self, Serialize},
 };
@@ -40,15 +40,12 @@ mod tests {
 
     use crab_nbt::NbtTag;
 
-    use crate::protocol::data_types::text_component::TextComponent;
-
     use super::*;
 
     #[test]
     fn test_nbt_tag_works() {
-        let tag = TextComponent::literal("test");
-        let mut buffer = Vec::new();
-        tag.serialize(&mut buffer).unwrap();
+        let tag = NbtTag::String("test".into());
+        let buffer = tag.serialize();
 
         let mut cursor = Cursor::new(buffer);
         let tag: NbtTag = Deserialize::deserialize(&mut cursor).unwrap();

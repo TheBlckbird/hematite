@@ -5,7 +5,7 @@ use std::{
 
 use tokio::{io::AsyncReadExt, net::TcpStream};
 
-use crate::protocol::ser_de::{
+use crate::{
     de::{self, Deserialize},
     ser::{self, Serialize},
 };

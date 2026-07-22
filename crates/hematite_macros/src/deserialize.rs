@@ -20,7 +20,7 @@ pub fn impl_deserialize_macro(ast: &DeriveInput) -> TokenStream {
                 });
 
                 deserializables.push(quote! {
-                    let #ident = crate::protocol::ser_de::de::Deserialize::deserialize(reader)?;
+                    let #ident = hematite_serialization::de::Deserialize::deserialize(reader)?;
                 });
 
                 constructor.push(quote! {
@@ -45,8 +45,8 @@ pub fn impl_deserialize_macro(ast: &DeriveInput) -> TokenStream {
     };
 
     quote! {
-        impl crate::protocol::ser_de::de::Deserialize for #struct_name {
-            fn deserialize<R: std::io::prelude::BufRead>(reader: &mut R) -> Result<Self, crate::protocol::ser_de::de::Error> {
+        impl hematite_serialization::de::Deserialize for #struct_name {
+            fn deserialize<R: std::io::prelude::BufRead>(reader: &mut R) -> Result<Self, hematite_serialization::de::Error> {
                 #deserialize
             }
         }

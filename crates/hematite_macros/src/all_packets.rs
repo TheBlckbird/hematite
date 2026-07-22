@@ -274,7 +274,7 @@ pub fn impl_all_packets(input: TokenStream) -> TokenStream {
                     });
 
                     engine_serializables.push(quote! {
-                        Self::Networking(#networking_clientbound_ident::#packet_ident(#internal_name)) => crate::protocol::ser_de::ser::Serialize::serialize(#internal_name, writer),
+                        Self::Networking(#networking_clientbound_ident::#packet_ident(#internal_name)) => hematite_serialization::ser::Serialize::serialize(#internal_name, writer),
                     });
                 } else {
                     get_ids.push(quote! {
@@ -282,7 +282,7 @@ pub fn impl_all_packets(input: TokenStream) -> TokenStream {
                     });
 
                     engine_serializables.push(quote! {
-                        Self::Engine(#engine_clientbound_ident::#packet_ident(#internal_name)) => crate::protocol::ser_de::ser::Serialize::serialize(#internal_name, writer),
+                        Self::Engine(#engine_clientbound_ident::#packet_ident(#internal_name)) => hematite_serialization::ser::Serialize::serialize(#internal_name, writer),
                     });
                 }
             }
@@ -297,7 +297,7 @@ pub fn impl_all_packets(input: TokenStream) -> TokenStream {
                 if packet.is_networking_layer {
                     from_ids.push(quote! {
                         (#id, ServerState::#state) => Some(
-                            crate::protocol::ser_de::de::Deserialize::deserialize(reader)
+                            hematite_serialization::de::Deserialize::deserialize(reader)
                                 .map(#networking_serverbound_ident::#packet_ident)
                                 .map(Self::Networking)
                         ),
@@ -305,7 +305,7 @@ pub fn impl_all_packets(input: TokenStream) -> TokenStream {
                 } else {
                     from_ids.push(quote! {
                         (#id, ServerState::#state) => Some(
-                            crate::protocol::ser_de::de::Deserialize::deserialize(reader)
+                            hematite_serialization::de::Deserialize::deserialize(reader)
                                 .map(#engine_serverbound_ident::#packet_ident)
                                 .map(Self::Engine)
                         ),
@@ -340,7 +340,7 @@ pub fn impl_all_packets(input: TokenStream) -> TokenStream {
                 }
             }
 
-            pub fn serialize<W: std::io::Write>(&self, writer: &mut W) -> Result<(), crate::protocol::ser_de::ser::Error> {
+            pub fn serialize<W: std::io::Write>(&self, writer: &mut W) -> Result<(), hematite_serialization::ser::Error> {
                 #[allow(non_snake_case)]
                 match self {
                     #(#engine_serializables)*
@@ -366,7 +366,7 @@ pub fn impl_all_packets(input: TokenStream) -> TokenStream {
                 id: &u8,
                 server_state: &ServerState,
                 reader: &mut R,
-            ) -> Option<Result<Self, crate::protocol::ser_de::de::Error>> {
+            ) -> Option<Result<Self, hematite_serialization::de::Error>> {
                 match (id, server_state) {
                     #(#from_ids)*
                     _ => None,

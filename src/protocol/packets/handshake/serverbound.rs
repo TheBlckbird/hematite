@@ -2,11 +2,12 @@ use std::io::BufRead;
 
 use hematite_ecs::prelude::*;
 use hematite_macros::Deserialize;
-
-use crate::protocol::{
-    data_types::{proto_string::ProtoString, var_int::VarInt},
-    ser_de::de::{self, Deserialize},
+use hematite_serialization::{
+    builtin_types::var_int::VarInt,
+    de::{self, Deserialize},
 };
+
+use crate::protocol::data_types::proto_string::ProtoString;
 
 #[derive(Debug, Deserialize, Message)]
 pub struct Handshake {

@@ -32,8 +32,8 @@ pub fn impl_serialize_macro(ast: &DeriveInput) -> TokenStream {
     };
 
     quote! {
-        impl crate::protocol::ser_de::ser::Serialize for #struct_name {
-            fn serialize<W: std::io::prelude::Write>(&self, writer: &mut W) -> Result<(), crate::protocol::ser_de::ser::Error> {
+        impl hematite_serialization::ser::Serialize for #struct_name {
+            fn serialize<W: std::io::prelude::Write>(&self, writer: &mut W) -> Result<(), hematite_serialization::ser::Error> {
                 #serialize
                 Ok(())
             }
