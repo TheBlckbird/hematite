@@ -5,10 +5,11 @@ use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
 use syn::{
-    Ident, LitStr, Token, parenthesized,
+    Ident, LitStr, Path, Token, parenthesized,
     parse::{Parse, ParseStream},
     parse_macro_input,
     punctuated::Punctuated,
+    spanned::Spanned,
 };
 
 use crate::packet::Packets;
@@ -86,7 +87,7 @@ impl Parse for Direction {
 }
 
 struct PacketEntry {
-    ident: Ident,
+    path: Path,
     internal_name: Option<LitStr>,
 }
 
@@ -96,20 +97,20 @@ impl Parse for PacketEntry {
 
         if input.parse::<Token![=]>().is_err() {
             return Ok(Self {
-                ident: packet,
+                path: packet,
                 internal_name: None,
             });
         }
 
         Ok(Self {
-            ident: packet,
+            path: packet,
             internal_name: input.parse()?,
         })
     }
 }
 
 struct PacketWithMetadata {
-    ident: Ident,
+    path: Path,
     internal_name: String,
     id: u8,
     state: Ident,
@@ -119,7 +120,7 @@ struct PacketWithMetadata {
 
 impl PacketWithMetadata {
     fn new(
-        ident: Ident,
+        path: Path,
         internal_name: String,
         id: u8,
         state: Ident,
@@ -127,7 +128,7 @@ impl PacketWithMetadata {
         is_networking_layer: bool,
     ) -> Self {
         Self {
-            ident,
+            path,
             internal_name,
             id,
             state,
@@ -150,16 +151,23 @@ impl TryFrom<AllPackets> for Vec<PacketWithMetadata> {
                         .internal_name
                         .as_ref()
                         .map(|internal_name| internal_name.value())
-                        .or_else(|| camel_case_to_snake_case(&packet.ident.to_string()))
+                        .or_else(|| {
+                            camel_case_to_snake_case(
+                                &packet.path.segments.last().unwrap().ident.to_string(),
+                            )
+                        })
                     else {
                         let span = match &packet.internal_name {
                             Some(internal_name) => internal_name.span(),
-                            None => packet.ident.span(),
+                            None => packet.path.segments.span(),
                         };
 
                         return Err(syn::Error::new(
                             span,
-                            format!("{} isn't a valid packet name", packet.ident),
+                            format!(
+                                "{} isn't a valid packet name",
+                                packet.path.segments.last().unwrap().ident
+                            ),
                         )
                         .into_compile_error()
                         .into());
@@ -174,7 +182,7 @@ impl TryFrom<AllPackets> for Vec<PacketWithMetadata> {
                     let Some(id) = find_protocol_id(&internal_name, direction) else {
                         let span = match &packet.internal_name {
                             Some(internal_name) => internal_name.span(),
-                            None => packet.ident.span(),
+                            None => packet.path.span(),
                         };
 
                         return Err(syn::Error::new(
@@ -186,7 +194,7 @@ impl TryFrom<AllPackets> for Vec<PacketWithMetadata> {
                     };
 
                     all_packets.push(PacketWithMetadata::new(
-                        packet.ident.clone(),
+                        packet.path.clone(),
                         internal_ident,
                         id,
                         state.clone(),
@@ -226,9 +234,10 @@ pub fn impl_all_packets(input: TokenStream) -> TokenStream {
 
     let (networking_clientbound, engine_clientbound): (Vec<_>, Vec<_>) =
         all_clientbound_packets.iter().partition_map(|packet| {
-            let packet_ident = &packet.ident;
+            let enum_variant = path_to_ident(&packet.path);
+            let packet_path = &packet.path;
             let generated = quote! {
-                #packet_ident(#packet_ident),
+                #enum_variant(#packet_path),
             };
 
             match packet.is_networking_layer {
@@ -239,9 +248,10 @@ pub fn impl_all_packets(input: TokenStream) -> TokenStream {
 
     let (networking_serverbound, engine_serverbound): (Vec<_>, Vec<_>) =
         all_serverbound_packets.iter().partition_map(|packet| {
-            let packet_ident = &packet.ident;
+            let enum_variant = path_to_ident(&packet.path);
+            let packet_path = &packet.path;
             let generated = quote! {
-                #packet_ident(#packet_ident),
+                #enum_variant(#packet_path),
             };
 
             match packet.is_networking_layer {
@@ -262,27 +272,28 @@ pub fn impl_all_packets(input: TokenStream) -> TokenStream {
     let networking_clientbound_ident = Ident::new("NetworkingCBPackets", Span::call_site());
 
     for packet in packets_list.iter() {
-        let packet_ident = &packet.ident;
+        let enum_variant = path_to_ident(&packet.path);
+        let packet_path = &packet.path;
         let id = &packet.id;
-        let internal_name = Ident::new(&packet.internal_name, packet.ident.span());
+        let internal_name = Ident::new(&packet.internal_name, packet.path.span());
 
         match packet.direction {
             Direction::Clientbound => {
                 if packet.is_networking_layer {
                     get_ids.push(quote! {
-                        Self::Networking(#networking_clientbound_ident::#packet_ident(_)) => #id,
+                        Self::Networking(#networking_clientbound_ident::#enum_variant(_)) => #id,
                     });
 
                     engine_serializables.push(quote! {
-                        Self::Networking(#networking_clientbound_ident::#packet_ident(#internal_name)) => hematite_serialization::ser::Serialize::serialize(#internal_name, writer),
+                        Self::Networking(#networking_clientbound_ident::#enum_variant(#internal_name)) => hematite_serialization::ser::Serialize::serialize(#internal_name, writer),
                     });
                 } else {
                     get_ids.push(quote! {
-                        Self::Engine(#engine_clientbound_ident::#packet_ident(_)) => #id,
+                        Self::Engine(#engine_clientbound_ident::#enum_variant(_)) => #id,
                     });
 
                     engine_serializables.push(quote! {
-                        Self::Engine(#engine_clientbound_ident::#packet_ident(#internal_name)) => hematite_serialization::ser::Serialize::serialize(#internal_name, writer),
+                        Self::Engine(#engine_clientbound_ident::#enum_variant(#internal_name)) => hematite_serialization::ser::Serialize::serialize(#internal_name, writer),
                     });
                 }
             }
@@ -298,7 +309,7 @@ pub fn impl_all_packets(input: TokenStream) -> TokenStream {
                     from_ids.push(quote! {
                         (#id, ServerState::#state) => Some(
                             hematite_serialization::de::Deserialize::deserialize(reader)
-                                .map(#networking_serverbound_ident::#packet_ident)
+                                .map(#networking_serverbound_ident::#enum_variant)
                                 .map(Self::Networking)
                         ),
                     });
@@ -306,17 +317,17 @@ pub fn impl_all_packets(input: TokenStream) -> TokenStream {
                     from_ids.push(quote! {
                         (#id, ServerState::#state) => Some(
                             hematite_serialization::de::Deserialize::deserialize(reader)
-                                .map(#engine_serverbound_ident::#packet_ident)
+                                .map(#engine_serverbound_ident::#enum_variant)
                                 .map(Self::Engine)
                         ),
                     });
 
                     send_events_args.push(quote! {
-                        mut #internal_name_writer: bevy_ecs::message::MessageWriter<#packet_ident>,
+                        mut #internal_name_writer: bevy_ecs::message::MessageWriter<#packet_path>,
                     });
 
                     send_events.push(quote! {
-                        Self::#packet_ident(#internal_name) => {#internal_name_writer.write(#internal_name);}
+                        Self::#enum_variant(#internal_name) => {#internal_name_writer.write(#internal_name);}
                     });
                 }
             }
@@ -453,6 +464,56 @@ fn camel_case_to_snake_case(input: &str) -> Option<String> {
     Some(output)
 }
 
+fn snake_case_to_camel_case(input: &str) -> Option<String> {
+    let mut input_parts = Vec::new();
+    let mut current_part = String::new();
+
+    for character in input.chars() {
+        if !character.is_ascii_lowercase() && character != '_' {
+            return None;
+        }
+
+        if character == '_' {
+            input_parts.push(current_part);
+            current_part = String::new();
+        } else {
+            current_part.push(character);
+        }
+    }
+
+    input_parts.push(current_part);
+
+    let mut output = String::new();
+
+    for part in input_parts {
+        let mut characters = part.chars();
+
+        output.push_str(
+            &(characters
+                .next()
+                .unwrap()
+                .to_uppercase()
+                .collect::<String>()
+                + characters.as_str()),
+        );
+    }
+
+    Some(output)
+}
+
+fn path_to_ident(path: &Path) -> Ident {
+    let joined_path = path
+        .segments
+        .iter()
+        .map(|segment| {
+            let stringified_ident = segment.ident.to_string();
+            snake_case_to_camel_case(&stringified_ident).unwrap_or(stringified_ident)
+        })
+        .join("");
+
+    Ident::new(&joined_path, Span::call_site())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -488,5 +549,32 @@ mod tests {
 
         let input = "real_snake_case";
         assert_eq!(camel_case_to_snake_case(input), None);
+    }
+
+    #[test]
+    fn test_snake_case_to_camel_case() {
+        let input = "camel_case";
+        assert_eq!(snake_case_to_camel_case(input), Some("CamelCase".into()));
+        let input = "upper";
+        assert_eq!(snake_case_to_camel_case(input), Some("Upper".into()));
+        let input = "u";
+        assert_eq!(snake_case_to_camel_case(input), Some("U".into()));
+        let input = "upper_long_camel_case";
+        assert_eq!(
+            snake_case_to_camel_case(input),
+            Some("UpperLongCamelCase".into())
+        );
+        let input = "h_t_m_l";
+        assert_eq!(snake_case_to_camel_case(input), Some("HTML".into()));
+    }
+
+    #[test]
+    fn test_snake_case_to_camel_case_fails() {
+        let input = "CamelCase";
+        assert_eq!(snake_case_to_camel_case(input), None);
+        let input = "Snake_Case";
+        assert_eq!(snake_case_to_camel_case(input), None);
+        let input = "UpperLongCamelCase";
+        assert_eq!(snake_case_to_camel_case(input), None);
     }
 }
