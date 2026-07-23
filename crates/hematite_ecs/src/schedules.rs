@@ -12,7 +12,7 @@ pub struct Startup;
 #[derive(ScheduleLabel, Hash, Debug, PartialEq, Eq, Clone, Copy)]
 pub struct First;
 
-/// Executed before the main [`Tick`]
+/// Executed before the main [`TickUpdate`]
 #[derive(ScheduleLabel, Hash, Debug, PartialEq, Eq, Clone, Copy)]
 pub struct PreTick;
 
@@ -20,7 +20,7 @@ pub struct PreTick;
 #[derive(ScheduleLabel, Hash, Debug, PartialEq, Eq, Clone, Copy)]
 pub struct TickUpdate;
 
-/// Executed after the main [`Tick`]
+/// Executed after the main [`TickUpdate`]
 #[derive(ScheduleLabel, Hash, Debug, PartialEq, Eq, Clone, Copy)]
 pub struct PostTick;
 
